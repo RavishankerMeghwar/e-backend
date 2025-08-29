@@ -1,7 +1,7 @@
 <?php
 header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: http://192.168.100.5:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
-// header("Access-Control-Allow-Origin: http://10.144.73.68:3000"); // Change to your Next.js domain
+// header("Access-Control-Allow-Origin: http://192.168.100.5:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
+header("Access-Control-Allow-Origin: http://10.144.73.68:3000"); // Change to your Next.js domain
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Access-Control-Allow-Credentials: true"); // Only if using cookies/sessions
@@ -282,7 +282,7 @@ function updateTest($data)
         if (isset($q['id'])) {
             // Update existing
             $qstmt = $pdo->prepare("UPDATE questions 
-                                    SET question_type = :question_type, question_text = :question_text, marks = :marks, correct_answer = :correct_answer 
+                                    SET question_type = :question_type, question_text = :question_text, marks = :marks, correct_answer = :correct_answer, options = :options
                                     WHERE id = :id AND test_id = :test_id");
             $qstmt->execute([
                 'id' => $q['id'],
@@ -290,18 +290,20 @@ function updateTest($data)
                 'question_type' => $q['question_type'],
                 'question_text' => $q['question_text'],
                 'marks' => $q['marks'],
-                'correct_answer' => $q['correct_answer']
+                'correct_answer' => $q['correct_answer'],
+                'options' => json_encode($q['options'] ?? [])
             ]);
         } else {
             // Insert new
-            $qstmt = $pdo->prepare("INSERT INTO questions (test_id, question_type, question_text, marks, correct_answer) 
-                                    VALUES (:test_id, :question_type, :question_text, :marks, :correct_answer)");
+            $qstmt = $pdo->prepare("INSERT INTO questions (test_id, question_type, question_text, marks, correct_answer, options) 
+                                    VALUES (:test_id, :question_type, :question_text, :marks, :correct_answer, :options)");
             $qstmt->execute([
                 'test_id' => $id,
                 'question_type' => $q['question_type'],
                 'question_text' => $q['question_text'],
                 'marks' => $q['marks'],
-                'correct_answer' => $q['correct_answer']
+                'correct_answer' => $q['correct_answer'],
+                'options' => json_encode($q['options'] ?? [])
             ]);
         }
     }
