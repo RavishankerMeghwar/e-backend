@@ -1,7 +1,7 @@
 <?php
 header("Content-Type: application/json");
-// header("Access-Control-Allow-Origin: http://192.168.100.5:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
-header("Access-Control-Allow-Origin: http://10.144.73.68:3000"); // Change to your Next.js domain
+header("Access-Control-Allow-Origin: http://192.168.100.5:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
+// header("Access-Control-Allow-Origin: http://10.144.73.68:3000"); // Change to your Next.js domain
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Access-Control-Allow-Credentials: true"); // Only if using cookies/sessions
@@ -33,6 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'GET
             break;
         case 'delete_test':
             deleteTest($_GET['id'] ?? null);
+            break;
+        case 'delete_question':
+            deleteQuestion($data);
             break;
         default:
             http_response_code(400);
@@ -262,56 +265,113 @@ function updateTest($data)
         return;
     }
 
-    $stmt = $pdo->prepare("UPDATE tests 
-                           SET title = :title, class_id = :class_id, subject_id = :subject_id, 
-                               teacher_id = :teacher_id, test_type = :test_type, date = :date, duration = :duration 
-                           WHERE id = :id");
-    $stmt->execute([
-        'title' => $title,
-        'class_id' => $class_id,
-        'subject_id' => $subject_id,
-        'teacher_id' => $teacher_id,
-        'test_type' => $test_type,
-        'date' => $date,
-        'duration' => $duration,
-        'id' => $id
-    ]);
+    try {
+        // Begin transaction
+        $pdo->beginTransaction();
 
-    // Update questions
-    foreach ($questions as $q) {
-        if (isset($q['id'])) {
-            // Update existing
-            $qstmt = $pdo->prepare("UPDATE questions 
-                                    SET question_type = :question_type, question_text = :question_text, marks = :marks, correct_answer = :correct_answer, options = :options
-                                    WHERE id = :id AND test_id = :test_id");
-            $qstmt->execute([
-                'id' => $q['id'],
-                'test_id' => $id,
-                'question_type' => $q['question_type'],
-                'question_text' => $q['question_text'],
-                'marks' => $q['marks'],
-                'correct_answer' => $q['correct_answer'],
-                'options' => $q['options'] ?? []
-            ]);
-        } else {
-            // Insert new
-            $qstmt = $pdo->prepare("INSERT INTO questions (test_id, question_type, question_text, marks, correct_answer, options) 
-                                    VALUES (:test_id, :question_type, :question_text, :marks, :correct_answer, :options)");
-            $qstmt->execute([
-                'test_id' => $id,
-                'question_type' => $q['question_type'],
-                'question_text' => $q['question_text'],
-                'marks' => $q['marks'],
-                'correct_answer' => $q['correct_answer'],
-                'options' => json_encode($q['options'] ?? [])
-            ]);
+        // Update test details
+        $stmt = $pdo->prepare("UPDATE tests 
+                               SET title = :title, class_id = :class_id, subject_id = :subject_id, 
+                                   teacher_id = :teacher_id, test_type = :test_type, date = :date, duration = :duration 
+                               WHERE id = :id");
+        $stmt->execute([
+            'title' => $title,
+            'class_id' => $class_id,
+            'subject_id' => $subject_id,
+            'teacher_id' => $teacher_id,
+            'test_type' => $test_type,
+            'date' => $date,
+            'duration' => $duration,
+            'id' => $id
+        ]);
+
+        // Get existing question IDs for this test
+        $existingStmt = $pdo->prepare("SELECT id FROM questions WHERE test_id = :test_id");
+        $existingStmt->execute(['test_id' => $id]);
+        $existingQuestionIds = $existingStmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        $processedQuestionIds = [];
+
+        // Update/Insert questions
+        foreach ($questions as $q) {
+            // Safely handle options
+            $options = null;
+            if (isset($q['options'])) {
+                if (is_array($q['options'])) {
+                    $options = json_encode($q['options']);
+                } else if (is_string($q['options'])) {
+                    // Check if it's already JSON
+                    $decoded = json_decode($q['options'], true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $options = $q['options']; // Already valid JSON
+                    } else {
+                        $options = json_encode([$q['options']]); // Wrap in array
+                    }
+                } else {
+                    $options = json_encode([]);
+                }
+            } else {
+                $options = json_encode([]);
+            }
+
+            if (isset($q['id']) && !empty($q['id'])) {
+                // Update existing question
+                $qstmt = $pdo->prepare("UPDATE questions 
+                                        SET question_type = :question_type, question_text = :question_text, 
+                                            marks = :marks, correct_answer = :correct_answer, options = :options
+                                        WHERE id = :id AND test_id = :test_id");
+                $qstmt->execute([
+                    'id' => $q['id'],
+                    'test_id' => $id,
+                    'question_type' => $q['question_type'] ?? 'objective',
+                    'question_text' => $q['question_text'] ?? '',
+                    'marks' => $q['marks'] ?? 1,
+                    'correct_answer' => $q['correct_answer'] ?? '',
+                    'options' => $options
+                ]);
+                $processedQuestionIds[] = $q['id'];
+            } else {
+                // Insert new question
+                $qstmt = $pdo->prepare("INSERT INTO questions (test_id, question_type, question_text, marks, correct_answer, options) 
+                                        VALUES (:test_id, :question_type, :question_text, :marks, :correct_answer, :options)");
+                $qstmt->execute([
+                    'test_id' => $id,
+                    'question_type' => $q['question_type'] ?? 'objective',
+                    'question_text' => $q['question_text'] ?? '',
+                    'marks' => $q['marks'] ?? 1,
+                    'correct_answer' => $q['correct_answer'] ?? '',
+                    'options' => $options
+                ]);
+                $processedQuestionIds[] = $pdo->lastInsertId();
+            }
         }
-    }
 
-    echo json_encode([
-        'status' => 'success',
-        'message' => 'Test and questions updated successfully'
-    ]);
+        // Delete questions that were removed (exist in DB but not in the update)
+        $questionsToDelete = array_diff($existingQuestionIds, $processedQuestionIds);
+        if (!empty($questionsToDelete)) {
+            $placeholders = str_repeat('?,', count($questionsToDelete) - 1) . '?';
+            $deleteStmt = $pdo->prepare("DELETE FROM questions WHERE test_id = ? AND id IN ($placeholders)");
+            $deleteStmt->execute(array_merge([$id], $questionsToDelete));
+        }
+
+        // Commit transaction
+        $pdo->commit();
+
+        echo json_encode([
+            'status' => 'success',
+            'message' => 'Test and questions updated successfully'
+        ]);
+
+    } catch (Exception $e) {
+        // Rollback transaction on error
+        $pdo->rollBack();
+        
+        http_response_code(500);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Failed to update test: ' . $e->getMessage()
+        ]);
+    }
 }
 // ✅ Delete Test
 function deleteTest($id)
@@ -335,3 +395,79 @@ function deleteTest($id)
         'message' => 'Test deleted successfully'
     ]);
 }
+
+
+function deleteQuestion($data)
+{
+    global $pdo;
+
+    $question_id = $data['question_id'] ?? null;
+    $test_id = $data['test_id'] ?? null;
+
+    // Validate required parameters
+    if (!$question_id) {
+        http_response_code(400);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Question ID is required'
+        ]);
+        return;
+    }
+
+    try {
+        // Begin transaction
+        $pdo->beginTransaction();
+
+        // If test_id is provided, verify the question belongs to that test
+        if ($test_id) {
+            $verifyStmt = $pdo->prepare("SELECT id FROM questions WHERE id = :question_id AND test_id = :test_id");
+            $verifyStmt->execute([
+                'question_id' => $question_id,
+                'test_id' => $test_id
+            ]);
+
+            if (!$verifyStmt->fetch()) {
+                http_response_code(404);
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'Question not found or does not belong to the specified test'
+                ]);
+                $pdo->rollBack();
+                return;
+            }
+        }
+
+        // Delete the question
+        $deleteStmt = $pdo->prepare("DELETE FROM questions WHERE id = :question_id");
+        $result = $deleteStmt->execute(['question_id' => $question_id]);
+
+        if ($result && $deleteStmt->rowCount() > 0) {
+            // Commit transaction
+            $pdo->commit();
+
+            echo json_encode([
+                'status' => 'success',
+                'message' => 'Question deleted successfully',
+                'deleted_question_id' => $question_id
+            ]);
+        } else {
+            $pdo->rollBack();
+            http_response_code(404);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Question not found or already deleted'
+            ]);
+        }
+
+    } catch (Exception $e) {
+        // Rollback transaction on error
+        $pdo->rollBack();
+        
+        http_response_code(500);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Failed to delete question: ' . $e->getMessage()
+        ]);
+    }
+}
+
