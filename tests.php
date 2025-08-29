@@ -291,7 +291,7 @@ function updateTest($data)
                 'question_text' => $q['question_text'],
                 'marks' => $q['marks'],
                 'correct_answer' => $q['correct_answer'],
-                'options' => json_encode($q['options'] ?? [])
+                'options' => $q['options'] ?? []
             ]);
         } else {
             // Insert new
