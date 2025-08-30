@@ -1,6 +1,6 @@
 <?php
 header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: http://192.168.100.5:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
+header("Access-Control-Allow-Origin: http://localhost:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
 // header("Access-Control-Allow-Origin: http://10.144.73.68:3000"); // Change to your Next.js domain
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
@@ -56,8 +56,9 @@ function createUser($data)
     $first_name = $data['first_name'] ?? '';
     $last_name = $data['last_name'] ?? '';
     $email = $data['email'] ?? '';
-    $password = $data['password'] ?? '';
+    $password = $data['password'] ?? '12345678';
     $role = $data['role'] ?? 'student';
+    $phone = $data['phone'] ?? '';
 
     if (!$email || !$password) {
         http_response_code(400);
@@ -72,14 +73,15 @@ function createUser($data)
     $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 
     try {
-        $stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, password, role, created_at) 
-                               VALUES (:first_name, :last_name, :email, :password, :role, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, password, role,phone, created_at) 
+                               VALUES (:first_name, :last_name, :email, :password, :role,:phone ,NOW())");
         $stmt->execute([
             'first_name' => $first_name,
             'last_name' => $last_name,
             'email' => $email,
             'password' => $hashedPassword,
-            'role' => $role
+            'role' => $role,
+            'phone' => $phone
         ]);
 
         echo json_encode([
@@ -100,7 +102,7 @@ function getAllUsers()
 {
     global $pdo;
 
-    $stmt = $pdo->query("SELECT id, first_name, last_name, email, role, created_at FROM users");
+    $stmt = $pdo->query("SELECT id, first_name, last_name, email, role,phone, created_at FROM users");
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
@@ -123,7 +125,7 @@ function getUser($id)
         return;
     }
 
-    $stmt = $pdo->prepare("SELECT id, first_name, last_name, email, role, created_at, updated_at 
+    $stmt = $pdo->prepare("SELECT id, first_name, last_name, email, role,phone, created_at 
                            FROM users WHERE id = :id");
     $stmt->execute(['id' => $id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -152,6 +154,7 @@ function updateUser($data)
     $email = $data['email'] ?? '';
     $password = $data['password'] ?? null; // Optional
     $role = $data['role'] ?? 'student';
+    $phone = $data['phone'] ?? '';
 
     if (!$id) {
         http_response_code(400);
@@ -166,7 +169,7 @@ function updateUser($data)
         $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
         $stmt = $pdo->prepare("UPDATE users 
                                SET first_name = :first_name, last_name = :last_name, email = :email, 
-                                   password = :password, role = :role, updated_at = NOW() 
+                                   password = :password, role = :role,phone:phone 
                                WHERE id = :id");
         $stmt->execute([
             'first_name' => $first_name,
@@ -179,7 +182,7 @@ function updateUser($data)
     } else {
         $stmt = $pdo->prepare("UPDATE users 
                                SET first_name = :first_name, last_name = :last_name, email = :email, 
-                                   role = :role, updated_at = NOW() 
+                                   role = :role 
                                WHERE id = :id");
         $stmt->execute([
             'first_name' => $first_name,

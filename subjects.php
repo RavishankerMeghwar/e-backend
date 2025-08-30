@@ -1,6 +1,6 @@
 <?php
 header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: http://192.168.100.5:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
+header("Access-Control-Allow-Origin: http://localhost:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
 // header("Access-Control-Allow-Origin: http://10.144.73.68:3000"); // Change to your Next.js domain
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
