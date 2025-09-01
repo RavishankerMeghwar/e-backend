@@ -1,16 +1,5 @@
 <?php
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: http://localhost:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
-// header("Access-Control-Allow-Origin: http://10.144.73.68:3000"); // Change to your Next.js domahttp://192.168.100.5:3000/locationsin
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Access-Control-Allow-Credentials: true"); // Only if using cookies/sessions
-
-// ✅ Handle preflight requests
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
+require_once 'cors.php';
 require_once 'database.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'GET') {
